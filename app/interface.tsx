@@ -38,6 +38,10 @@ const ChatComponent: React.FC = () => {
     const [message, setMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    // Explicitly type the new message to preserve the literal type
+    // const newMessage: ChatMessage = { role: 'user', content: text };
+    // const updatedHistory: ChatMessage[] = [...conversation, newMessage];
+    // setConversation(updatedHistory);
 
     // Scroll to bottom on new messages
     useEffect(() => {
@@ -49,9 +53,8 @@ const ChatComponent: React.FC = () => {
         const text = message.trim();
         if (!text) return;
 
-        // Locally append user message
-        // Locally append user message
-        const updatedHistory = [...conversation, { role: 'user', content: text }];
+        const newMessage: ChatMessage = { role: 'user', content: text };
+        const updatedHistory: ChatMessage[] = [...conversation, newMessage];
         setConversation(updatedHistory);
         setIsLoading(true);
 
