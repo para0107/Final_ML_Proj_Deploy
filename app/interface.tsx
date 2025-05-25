@@ -15,11 +15,19 @@ type ChatResponse = {
     history: ChatMessage[];
 };
 
-function isValidRole(role: any): role is ChatMessage['role'] {
+function isValidRole(role: unknown): role is ChatMessage['role'] {
     return role === 'user' || role === 'assistant' || role === 'system';
 }
 
-function sanitizeHistory(history: any[]): ChatMessage[] {
+// Define a type for potentially unsanitized messages
+type UnsanitizedMessage = {
+    role: unknown;
+    content: unknown;
+    [key: string]: unknown; // Allow other properties
+};
+
+
+function sanitizeHistory(history: UnsanitizedMessage[]): ChatMessage[] {
     return history
         .filter(msg => isValidRole(msg.role) && typeof msg.content === 'string')
         .map(msg => ({ role: msg.role, content: msg.content }));
