@@ -41,7 +41,7 @@ function sanitizeHistory(history: UnsanitizedMessage[]): ChatMessage[] {
 
 
 // URL of your FastAPI endpoint
-const API_URL = "http://localhost:8000/rag_chat";
+const API_URL = "https://fbd-backend.onrender.com/rag_chat";
 
 const ChatComponent: React.FC = () => {
     // Seed with the system prompt
