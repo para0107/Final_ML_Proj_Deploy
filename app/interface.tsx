@@ -29,8 +29,13 @@ type UnsanitizedMessage = {
 
 function sanitizeHistory(history: UnsanitizedMessage[]): ChatMessage[] {
     return history
-        .filter(msg => isValidRole(msg.role) && typeof msg.content === 'string')
-        .map(msg => ({ role: msg.role, content: msg.content }));
+        .filter((msg): msg is UnsanitizedMessage & { role: ChatMessage['role']; content: string } =>
+            isValidRole(msg.role) && typeof msg.content === 'string'
+        )
+        .map(msg => ({
+            role: msg.role,
+            content: msg.content
+        }));
 }
 
 
