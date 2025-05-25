@@ -39,7 +39,7 @@ const ChatComponent: React.FC = () => {
 
             // Replace local history with the updated history from server
             setConversation(response.data.history);
-        } catch (error) {
+        } catch  {
             setConversation(prev => [
                 ...prev,
                 {
