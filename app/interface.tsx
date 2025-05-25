@@ -26,20 +26,20 @@ const ChatComponent: React.FC = () => {
     const sendMessage = async () => {
         if (!message.trim()) return;
 
-        // Append user message locally
-        const updatedHistory = [...conversation, { role: 'user', content: message }];
+        const updatedHistory: Message[] = [...conversation, { role: 'user', content: message }];
         setConversation(updatedHistory);
         setIsLoading(true);
 
         try {
-            const response = await axios.post('http://localhost:8000/rag_chat', {
-                message,
-                history: updatedHistory,
-            });
-
-            // Replace local history with the updated history from server
+            const response = await axios.post<{ answer: string; history: Message[] }>(
+                process.env.NEXT_PUBLIC_API_URL + '/rag_chat',
+                {
+                    message,
+                    history: updatedHistory,
+                }
+            );
             setConversation(response.data.history);
-        } catch  {
+        } catch {
             setConversation(prev => [
                 ...prev,
                 {
@@ -55,15 +55,13 @@ const ChatComponent: React.FC = () => {
 
     return (
         <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#f3e8ff] via-[#ffe0f0] to-[#e0f7fa] font-sans font-medium tracking-wide">
-            {/* Welcome Title and Subtitle */}
             <div className="flex flex-col items-center mt-8 mb-8">
                 <h2 className="text-4xl font-bold text-violet-700 mb-2">Welcome to FBD LLM</h2>
                 <p className="text-lg text-violet-500 text-center max-w-md">
-                    Start a conversation! FBD is ready to fuck you up.
+                    Start a conversation! FBD is ready to answer your questions.
                 </p>
             </div>
 
-            {/* Centered Input Box */}
             <div className="flex-1 flex flex-col items-center w-full">
                 <div className="flex flex-col items-center w-full">
                     <div className="flex justify-center w-full">
@@ -95,7 +93,6 @@ const ChatComponent: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Chat Answers Below Input */}
                 <div className="flex flex-col items-center w-full">
                     <div className="w-full max-w-5xl space-y-6">
                         {conversation.map((msg, idx) => (
