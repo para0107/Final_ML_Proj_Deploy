@@ -15,6 +15,18 @@ type ChatResponse = {
     history: ChatMessage[];
 };
 
+function isValidRole(role: any): role is ChatMessage['role'] {
+    return role === 'user' || role === 'assistant' || role === 'system';
+}
+
+function sanitizeHistory(history: any[]): ChatMessage[] {
+    return history
+        .filter(msg => isValidRole(msg.role) && typeof msg.content === 'string')
+        .map(msg => ({ role: msg.role, content: msg.content }));
+}
+
+
+
 // URL of your FastAPI endpoint
 const API_URL = "http://localhost:8000/rag_chat";
 
@@ -38,6 +50,7 @@ const ChatComponent: React.FC = () => {
         if (!text) return;
 
         // Locally append user message
+        // Locally append user message
         const updatedHistory = [...conversation, { role: 'user', content: text }];
         setConversation(updatedHistory);
         setIsLoading(true);
@@ -49,7 +62,7 @@ const ChatComponent: React.FC = () => {
                 { headers: { 'Content-Type': 'application/json' } }
             );
             // Update with server history (includes assistant reply)
-            setConversation(data.history);
+            setConversation(sanitizeHistory(data.history));
         } catch {
             setConversation(prev => [
                 ...prev,
