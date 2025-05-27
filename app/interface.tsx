@@ -41,8 +41,8 @@ function sanitizeHistory(history: UnsanitizedMessage[]): ChatMessage[] {
 
 
 // URL of your FastAPI endpoint
-//  const API_URL = "https://backend-chatbot-llm.onrender.com/rag_chat"; //THIS IS FOR EXTERNAL DEPLOYMENT
-const API_URL = "http://localhost:8000/rag_chat"; //This is for LOCAL ONLY
+ const API_URL = "https://backend-chatbot-llm.onrender.com/rag_chat"; //THIS IS FOR EXTERNAL DEPLOYMENT
+// const API_URL = "http://localhost:8000/rag_chat"; //This is for LOCAL ONLY
 //DO NOT PUSH AND COMMIT !!!!!!!!!!!!!!!!!!!!!
 const ChatComponent: React.FC = () => {
     // Seed with the system prompt
