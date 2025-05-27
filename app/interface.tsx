@@ -41,13 +41,16 @@ function sanitizeHistory(history: UnsanitizedMessage[]): ChatMessage[] {
 
 
 // URL of your FastAPI endpoint
-const API_URL = "https://backend-chatbot-llm.onrender.com/rag_chat";
-
+ const API_URL = "https://backend-chatbot-llm.onrender.com/rag_chat"; //THIS IS FOR EXTERNAL DEPLOYMENT
+// const API_URL = "http://localhost:8000/rag_chat"; //This is for LOCAL ONLY
+//DO NOT PUSH AND COMMIT !!!!!!!!!!!!!!!!!!!!!
 const ChatComponent: React.FC = () => {
     // Seed with the system prompt
     const [conversation, setConversation] = useState<ChatMessage[]>([
         { role: 'system', content: '' }
     ]);
+
+
     const [message, setMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -90,13 +93,38 @@ const ChatComponent: React.FC = () => {
         }
     };
 
+
+    const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    // Add this function to handle textarea resizing
+    const resizeTextarea = () => {
+        const textarea = inputRef.current;
+        if (textarea) {
+            // Reset height to calculate proper scrollHeight
+            textarea.style.height = 'auto';
+            // Set height based on content
+            textarea.style.height = `${textarea.scrollHeight}px`;
+            // Calculate width based on content length
+            const minWidth = 224; // w-56 equivalent in pixels
+            const contentWidth = Math.min(Math.max(message.length * 10, minWidth), 640); // Max 640px
+            textarea.style.width = `${contentWidth}px`;
+        }
+    };
+
+    // Resize on content change
+    useEffect(() => {
+        resizeTextarea();
+    }, [message]);
+
+
+
     return (
         <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#f3e8ff] via-[#ffe0f0] to-[#e0f7fa] p-4">
             {/* Header */}
             <header className="text-center py-6">
-                <h1 className="text-3xl sm:text-4xl font-extrabold text-violet-700">Welcome to FBD LLM</h1>
+                <h1 className="text-3xl sm:text-4xl font-extrabold text-violet-700">Welcome to FBM LLM</h1>
                 <p className="text-md sm:text-lg text-violet-500 mt-2">
-                    Start a conversation! FBD is ready to answer your questions.
+                    Start a conversation! FBM is ready to answer your questions.
                 </p>
             </header>
 
@@ -143,7 +171,7 @@ const ChatComponent: React.FC = () => {
 
                         return (
                             <div key={idx} className={`flex ${align}`}>
-                                <div className={`${bubbleWidth} px-5 py-4 rounded-2xl shadow-lg my-4 ${bubbleBg} transition-transform duration-300 ease-out hover:scale-105`}>
+                                <div className={`${bubbleWidth} px-5 py-4 rounded-2xl shadow-lg my-7 ${bubbleBg} transition-transform duration-300 ease-out hover:scale-105`}>
                                     {msg.content}
                                 </div>
                             </div>
