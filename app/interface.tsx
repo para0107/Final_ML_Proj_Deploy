@@ -1,91 +1,79 @@
-"use client";
+'use client'
 
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import './animations.css';
 
-// Types matching FastAPI Pydantic models
-type ChatMessage = {
+type Message = {
     role: 'user' | 'assistant' | 'system';
     content: string;
 };
 
-type ChatResponse = {
+type Metric = {
+    dataset: string;
+    bleu: number | null;
+    rouge: Record<string, number> | null;
+};
+
+type RagChatResponse = {
     answer: string;
-    history: ChatMessage[];
+    history: Message[];
+    metrics?: Metric[];
 };
 
-function isValidRole(role: unknown): role is ChatMessage['role'] {
-    return role === 'user' || role === 'assistant' || role === 'system';
-}
-
-// Define a type for potentially unsanitized messages
-type UnsanitizedMessage = {
-    role: unknown;
-    content: unknown;
-    [key: string]: unknown; // Allow other properties
+type EvaluateResponse = {
+    evaluation: string;
 };
 
-
-function sanitizeHistory(history: UnsanitizedMessage[]): ChatMessage[] {
-    return history
-        .filter((msg): msg is UnsanitizedMessage & { role: ChatMessage['role']; content: string } =>
-            isValidRole(msg.role) && typeof msg.content === 'string'
-        )
-        .map(msg => ({
-            role: msg.role,
-            content: msg.content
-        }));
-}
-
-
-
-// URL of your FastAPI endpoint
- const API_URL = "https://backend-chatbot-llm.onrender.com/rag_chat"; //THIS IS FOR EXTERNAL DEPLOYMENT
-// const API_URL = "http://localhost:8000/rag_chat"; //This is for LOCAL ONLY
-//DO NOT PUSH AND COMMIT !!!!!!!!!!!!!!!!!!!!!
 const ChatComponent: React.FC = () => {
-    // Seed with the system prompt
-    const [conversation, setConversation] = useState<ChatMessage[]>([
-        { role: 'system', content: '' }
-    ]);
-
-
     const [message, setMessage] = useState('');
+    const [conversation, setConversation] = useState<Message[]>([]);
+    const [metrics, setMetrics] = useState<Metric[]>([]);
+    const [evaluation, setEvaluation] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    // Explicitly type the new message to preserve the literal type
-    // const newMessage: ChatMessage = { role: 'user', content: text };
-    // const updatedHistory: ChatMessage[] = [...conversation, newMessage];
-    // setConversation(updatedHistory);
 
-    // Scroll to bottom on new messages
-    useEffect(() => {
+    const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [conversation, isLoading]);
+    };
 
-    // Send a message to FastAPI
+    useEffect(() => {
+        scrollToBottom();
+    }, [conversation, isLoading, metrics, evaluation]);
+
     const sendMessage = async () => {
-        const text = message.trim();
-        if (!text) return;
+        if (!message.trim()) return;
 
-        const newMessage: ChatMessage = { role: 'user', content: text };
-        const updatedHistory: ChatMessage[] = [...conversation, newMessage];
+        // append user message locally
+        const updatedHistory = [...conversation, { role: 'user' as const, content: message }];
         setConversation(updatedHistory);
         setIsLoading(true);
+        setEvaluation(null);
 
         try {
-            const { data } = await axios.post<ChatResponse>(
-                API_URL,
-                { message: text, history: updatedHistory },
-                { headers: { 'Content-Type': 'application/json' } }
-            );
-            // Update with server history (includes assistant reply)
-            setConversation(sanitizeHistory(data.history));
-        } catch {
+            // 1) call chat endpoint
+            const chatResp = await axios.post<RagChatResponse>('http://localhost:8000/rag_chat', {
+                message,
+                history: updatedHistory,
+                ground_truth_source: 'all'
+            });
+
+            // update conversation and metrics
+            setConversation(chatResp.data.history);
+            setMetrics(chatResp.data.metrics || []);
+
+            // 2) call evaluate endpoint
+            const evalResp = await axios.post<EvaluateResponse>('http://localhost:8000/evaluate', {
+                question: message,
+                answer: chatResp.data.answer
+            });
+            setEvaluation(evalResp.data.evaluation);
+
+        } catch (error) {
+            console.error(error);
             setConversation(prev => [
                 ...prev,
-                { role: 'system', content: 'Error: Could not connect to the chat service.' }
+                { role: 'system', content: 'Error: Could not connect to the chat service.' },
             ]);
         } finally {
             setIsLoading(false);
@@ -93,102 +81,116 @@ const ChatComponent: React.FC = () => {
         }
     };
 
-
-    const inputRef = useRef<HTMLTextAreaElement>(null);
-
-    // Add this function to handle textarea resizing
-    const resizeTextarea = () => {
-        const textarea = inputRef.current;
-        if (textarea) {
-            // Reset height to calculate proper scrollHeight
-            textarea.style.height = 'auto';
-            // Set height based on content
-            textarea.style.height = `${textarea.scrollHeight}px`;
-            // Calculate width based on content length
-            const minWidth = 224; // w-56 equivalent in pixels
-            const contentWidth = Math.min(Math.max(message.length * 10, minWidth), 640); // Max 640px
-            textarea.style.width = `${contentWidth}px`;
-        }
-    };
-
-    // Resize on content change
-    useEffect(() => {
-        resizeTextarea();
-    }, [message]);
-
-
-
+    // only show metrics where at least one non-null
+    const visibleMetrics = metrics
     return (
-        <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#f3e8ff] via-[#ffe0f0] to-[#e0f7fa] p-4">
-            {/* Header */}
-            <header className="text-center py-6">
-                <h1 className="text-3xl sm:text-4xl font-extrabold text-violet-700">Welcome to FBM LLM</h1>
-                <p className="text-md sm:text-lg text-violet-500 mt-2">
-                    Start a conversation! FBM is ready to answer your questions.
+        <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#f3e8ff] via-[#ffe0f0] to-[#e0f7fa] font-sans font-medium tracking-wide">
+            {/* Welcome Title and Subtitle */}
+            <div className="flex flex-col items-center mt-8 mb-8">
+                <h2 className="text-4xl font-bold text-violet-700 mb-2">Welcome to FBD LLM</h2>
+                <p className="text-lg text-violet-500 text-center max-w-md">
+                    Start a conversation! FBD is ready to help you.
                 </p>
-            </header>
+            </div>
 
-            {/* Input Bar: dynamic, playful */}
-            <section className="flex justify-center mb-6">
-                <div className="relative">
-                    <input
-                        type="text"
-                        placeholder="Type your message..."
-                        value={message}
-                        onChange={e => setMessage(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                        disabled={isLoading}
-                        className="w-56 sm:w-64 focus:w-80 transition-all duration-300 ease-out px-4 py-2 rounded-full shadow-lg outline-none border-2 border-transparent focus:border-violet-300 focus:ring-2 focus:ring-violet-200"
-                    />
-                    <button
-                        onClick={sendMessage}
-                        disabled={isLoading || !message.trim()}
-                        className="absolute right-1 top-1 bg-gradient-to-r from-blue-700 to-blue-900 text-white px-3 py-1 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-transform duration-200 hover:scale-105"
-                    >
-                        Send
-                    </button>
+            {/* Centered Input Box */}
+            <div className="flex-1 flex flex-col items-center w-full">
+                <div className="flex justify-center w-full">
+                    <div className="w-[400px]">
+                        <div className="flex items-center bg-gradient-to-r from-blue-900 to-black rounded-2xl shadow-xl border-2 border-blue-900 p-3 mt-8 mb-8 h-20">
+                            <input
+                                type="text"
+                                value={message}
+                                onChange={e => setMessage(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                                placeholder="Type your message..."
+                                disabled={isLoading}
+                                className="flex-1 bg-transparent outline-none text-white placeholder-blue-300 px-2 text-lg h-full"
+                                style={{ minHeight: '2.5rem' }}
+                            />
+                            <button
+                                onClick={sendMessage}
+                                disabled={isLoading || !message.trim()}
+                                className={`ml-3 px-6 py-2 rounded-xl font-bold transition-all h-12 ${
+                                    isLoading || !message.trim()
+                                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-blue-700 to-blue-900 text-white hover:opacity-90'
+                                }`}
+                            >
+                                Send
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </section>
 
-            {/* Conversation */}
-            <main className="flex-1 overflow-auto px-2">
-                <div className="space-y-6 max-w-3xl mx-auto">
-                    {conversation.map((msg, idx) => {
-                        const isUser = msg.role === 'user';
-                        const isAssistant = msg.role === 'assistant';
-                        const align = isUser ? 'justify-end' : isAssistant ? 'justify-start' : 'justify-center';
-
-                        // All Q/A bubbles: dark blue background, white text
-                        const bubbleBg = msg.role === 'system'
-                            ? 'bg-yellow-100 border border-yellow-300 text-yellow-800'
-                            : 'bg-blue-900 text-white';
-
-                        const bubbleWidth = msg.role === 'system'
-                            ? 'w-full sm:w-3/4'
-                            : isUser
-                                ? 'w-3/5 sm:w-2/5'
-                                : 'w-3/4 sm:w-1/2';
-
-                        return (
-                            <div key={idx} className={`flex ${align}`}>
-                                <div className={`${bubbleWidth} px-5 py-4 rounded-2xl shadow-lg my-7 ${bubbleBg} transition-transform duration-300 ease-out hover:scale-105`}>
+                {/* Chat & Metrics/Evaluation Panel */}
+                <div className="flex w-full max-w-5xl flex-1 overflow-hidden">
+                    {/* Chat Column */}
+                    <div className="w-1/2 p-4 overflow-y-auto flex flex-col gap-12">
+                        {conversation.map((msg, idx) => (
+                            <div
+                                key={idx}
+                                className={`flex animate-fadeIn transition-all duration-700 z-10 ${
+                                    msg.role === 'user'
+                                        ? 'justify-end'
+                                        : msg.role === 'assistant'
+                                            ? 'justify-start'
+                                            : 'justify-center'
+                                }`}
+                            >
+                                <div
+                                    className={`bg-blue-900 text-white rounded-3xl shadow-lg p-6 w-full max-w-xl whitespace-pre-wrap transition-all duration-700 ${
+                                        msg.role === 'system' ? 'bg-yellow-100 text-yellow-800' : ''
+                                    }`}
+                                >
                                     {msg.content}
                                 </div>
                             </div>
-                        );
-                    })}
-
-                    {isLoading && (
-                        <div className="flex justify-center">
-                            <div className="w-1/2 sm:w-1/3 bg-blue-900 text-white px-4 py-3 rounded-2xl shadow-lg my-4 animate-pulse">
-                                FBD is typing...
+                        ))}
+                        {isLoading && (
+                            <div className="flex animate-fadeIn transition-all duration-700 justify-start w-full z-10">
+                                <div className="bg-blue-900 p-6 rounded-3xl shadow-lg flex items-center w-full max-w-xl z-10">
+                                    <div className="animate-typing text-white text-lg font-medium">FBD is typing...</div>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                        <div ref={messagesEndRef} />
+                    </div>
 
-                    <div ref={messagesEndRef} />
+                    {/* Metrics & Evaluation Column */}
+                    <div className="w-1/2 p-8 border-l-2 border-blue-900 flex flex-col justify-start">
+                        <h2 className="text-2xl font-semibold mb-4">Metrics</h2>
+                        {visibleMetrics.length === 0 ? (
+                            <p className="text-gray-600">No metrics yet.</p>
+                        ) : (
+                            visibleMetrics.map(m => (
+                                <div key={m.dataset} className="mb-4">
+                                    <div className="text-lg">
+                                        <strong>BLEU-{m.dataset}</strong> = {m.bleu != null ? m.bleu.toFixed(4) : '–'}
+                                    </div>
+                                    <div className="text-lg mt-1">
+                                        <strong>ROUGE-{m.dataset}</strong>{' '}
+                                        {m.rouge
+                                            ? Object.entries(m.rouge)
+                                                .map(([k, v]) => `${k}:${v.toFixed(4)}`)
+                                                .join(', ')
+                                            : '–'}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+
+                        <h2 className="text-2xl font-semibold mt-8 mb-4">Evaluation</h2>
+                        {evaluation ? (
+                            <div className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-gray-800">
+                                {evaluation}
+                            </div>
+                        ) : (
+                            <p className="text-gray-600">No evaluation yet.</p>
+                        )}
+                    </div>
                 </div>
-            </main>
+            </div>
         </div>
     );
 };
