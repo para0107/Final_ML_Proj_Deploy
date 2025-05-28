@@ -1,196 +1,178 @@
-"use client";
+'use client'
 
-import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
-import './animations.css';
+import React, { useState, useRef, useEffect } from 'react'
+import axios from 'axios'
 
-// Types matching FastAPI Pydantic models
-type ChatMessage = {
-    role: 'user' | 'assistant' | 'system';
-    content: string;
-};
-
-type ChatResponse = {
-    answer: string;
-    history: ChatMessage[];
-};
-
-function isValidRole(role: unknown): role is ChatMessage['role'] {
-    return role === 'user' || role === 'assistant' || role === 'system';
+type Message = {
+    role: 'user' | 'assistant' | 'system'
+    content: string
 }
 
-// Define a type for potentially unsanitized messages
-type UnsanitizedMessage = {
-    role: unknown;
-    content: unknown;
-    [key: string]: unknown; // Allow other properties
-};
-
-
-function sanitizeHistory(history: UnsanitizedMessage[]): ChatMessage[] {
-    return history
-        .filter((msg): msg is UnsanitizedMessage & { role: ChatMessage['role']; content: string } =>
-            isValidRole(msg.role) && typeof msg.content === 'string'
-        )
-        .map(msg => ({
-            role: msg.role,
-            content: msg.content
-        }));
+type RagChatResponse = {
+    answer: string
+    history: Message[]
 }
 
+export default function ChatComponent() {
+    const [message, setMessage] = useState('')
+    const [conversation, setConversation] = useState<Message[]>([])
+    const [loading, setLoading] = useState(false)
+    const endRef = useRef<HTMLDivElement>(null)
 
-
-// URL of your FastAPI endpoint
- const API_URL = "https://backend-chatbot-llm.onrender.com/rag_chat"; //THIS IS FOR EXTERNAL DEPLOYMENT
-// const API_URL = "http://localhost:8000/rag_chat"; //This is for LOCAL ONLY
-//DO NOT PUSH AND COMMIT !!!!!!!!!!!!!!!!!!!!!
-const ChatComponent: React.FC = () => {
-    // Seed with the system prompt
-    const [conversation, setConversation] = useState<ChatMessage[]>([
-        { role: 'system', content: '' }
-    ]);
-
-
-    const [message, setMessage] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    // Explicitly type the new message to preserve the literal type
-    // const newMessage: ChatMessage = { role: 'user', content: text };
-    // const updatedHistory: ChatMessage[] = [...conversation, newMessage];
-    // setConversation(updatedHistory);
-
-    // Scroll to bottom on new messages
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [conversation, isLoading]);
+        endRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, [conversation])
 
-    // Send a message to FastAPI
     const sendMessage = async () => {
-        const text = message.trim();
-        if (!text) return;
+        if (!message.trim()) return
+        setLoading(true)
 
-        const newMessage: ChatMessage = { role: 'user', content: text };
-        const updatedHistory: ChatMessage[] = [...conversation, newMessage];
-        setConversation(updatedHistory);
-        setIsLoading(true);
+        const updated = [
+            ...conversation,
+            { role: 'user' as const, content: message.trim() },
+        ]
+        setConversation(updated)
 
         try {
-            const { data } = await axios.post<ChatResponse>(
-                API_URL,
-                { message: text, history: updatedHistory },
-                { headers: { 'Content-Type': 'application/json' } }
-            );
-            // Update with server history (includes assistant reply)
-            setConversation(sanitizeHistory(data.history));
-        } catch {
-            setConversation(prev => [
+            const { data } = await axios.post<RagChatResponse>(
+                'http://localhost:8000/rag_chat',
+                {
+                    message,
+                    history: updated,
+                }
+            )
+
+            setConversation((prev) => [
                 ...prev,
-                { role: 'system', content: 'Error: Could not connect to the chat service.' }
-            ]);
+                { role: 'assistant', content: data.answer },
+            ])
+        } catch {
+            setConversation((prev) => [
+                ...prev,
+                {
+                    role: 'system',
+                    content: '⚠️ Could not connect to the chat service.',
+                },
+            ])
         } finally {
-            setIsLoading(false);
-            setMessage('');
+            setMessage('')
+            setLoading(false)
         }
-    };
-
-
-    const inputRef = useRef<HTMLTextAreaElement>(null);
-
-    // Add this function to handle textarea resizing
-    const resizeTextarea = () => {
-        const textarea = inputRef.current;
-        if (textarea) {
-            // Reset height to calculate proper scrollHeight
-            textarea.style.height = 'auto';
-            // Set height based on content
-            textarea.style.height = `${textarea.scrollHeight}px`;
-            // Calculate width based on content length
-            const minWidth = 224; // w-56 equivalent in pixels
-            const contentWidth = Math.min(Math.max(message.length * 10, minWidth), 640); // Max 640px
-            textarea.style.width = `${contentWidth}px`;
-        }
-    };
-
-    // Resize on content change
-    useEffect(() => {
-        resizeTextarea();
-    }, [message]);
-
-
+    }
 
     return (
-        <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#f3e8ff] via-[#ffe0f0] to-[#e0f7fa] p-4">
-            {/* Header */}
-            <header className="text-center py-6">
-                <h1 className="text-3xl sm:text-4xl font-extrabold text-violet-700">Welcome to FBM LLM</h1>
-                <p className="text-md sm:text-lg text-violet-500 mt-2">
-                    Start a conversation! FBM is ready to answer your questions.
+        <div
+            style={{
+                minHeight: '100vh',
+                display: 'flex',
+                flexDirection: 'column',
+                background: 'linear-gradient(135deg, #ffe0f0 0%, #e0f7fa 100%)',
+                fontFamily: 'sans-serif',
+            }}
+        >
+            {/* HEADER + INPUT */}
+            <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+                <h1 style={{ fontSize: '3rem', margin: 0 }}>Welcome to FBD LLM</h1>
+                <p style={{ margin: '0.5rem 0 1.5rem', color: '#555' }}>
+                    Start a conversation! FBD is ready to help you.
                 </p>
-            </header>
-
-            {/* Input Bar: dynamic, playful */}
-            <section className="flex justify-center mb-6">
-                <div className="relative">
+                <div style={{ display: 'inline-flex', width: '60%' }}>
                     <input
                         type="text"
                         placeholder="Type your message..."
                         value={message}
-                        onChange={e => setMessage(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                        disabled={isLoading}
-                        className="w-56 sm:w-64 focus:w-80 transition-all duration-300 ease-out px-4 py-2 rounded-full shadow-lg outline-none border-2 border-transparent focus:border-violet-300 focus:ring-2 focus:ring-violet-200"
+                        onChange={(e) => setMessage(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                        disabled={loading}
+                        style={{
+                            flex: 1,
+                            padding: '0.75rem 1rem',
+                            fontSize: '1.1rem',
+                            borderRadius: '999px 0 0 999px',
+                            border: '2px solid #ff99c8',
+                            outline: 'none',
+                        }}
                     />
                     <button
                         onClick={sendMessage}
-                        disabled={isLoading || !message.trim()}
-                        className="absolute right-1 top-1 bg-gradient-to-r from-blue-700 to-blue-900 text-white px-3 py-1 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-transform duration-200 hover:scale-105"
+                        disabled={loading || !message.trim()}
+                        style={{
+                            padding: '0.75rem 1.5rem',
+                            fontSize: '1.1rem',
+                            borderRadius: '0 999px 999px 0',
+                            border: 'none',
+                            background:
+                                loading || !message.trim() ? '#ccc' : '#ff69b4',
+                            color: 'white',
+                            cursor: loading || !message.trim() ? 'not-allowed' : 'pointer',
+                        }}
                     >
                         Send
                     </button>
                 </div>
-            </section>
+            </div>
 
-            {/* Conversation */}
-            <main className="flex-1 overflow-auto px-2">
-                <div className="space-y-6 max-w-3xl mx-auto">
-                    {conversation.map((msg, idx) => {
-                        const isUser = msg.role === 'user';
-                        const isAssistant = msg.role === 'assistant';
-                        const align = isUser ? 'justify-end' : isAssistant ? 'justify-start' : 'justify-center';
+            {/* FULL-WIDTH CHAT AREA */}
+            <div
+                style={{
+                    flex: 1,
+                    padding: '1rem',
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
+                }}
+            >
+                {conversation.map((m, i) => (
+                    <div
+                        key={i}
+                        style={{
+                            alignSelf:
+                                m.role === 'user'
+                                    ? 'flex-end'
+                                    : m.role === 'assistant'
+                                        ? 'flex-start'
+                                        : 'center',
+                            maxWidth: '70%',
+                            background:
+                                m.role === 'user'
+                                    ? '#ff69b4'
+                                    : m.role === 'assistant'
+                                        ? 'white'
+                                        : '#fffae6',
+                            color: m.role === 'user' ? 'white' : '#333',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '1rem',
+                            boxShadow:
+                                m.role === 'assistant'
+                                    ? '0 1px 4px rgba(0,0,0,0.1)'
+                                    : 'none',
+                            whiteSpace: 'pre-wrap',
+                            fontSize: '1rem',
+                        }}
+                    >
+                        {m.content}
+                    </div>
+                ))}
 
-                        // All Q/A bubbles: dark blue background, white text
-                        const bubbleBg = msg.role === 'system'
-                            ? 'bg-yellow-100 border border-yellow-300 text-yellow-800'
-                            : 'bg-blue-900 text-white';
+                {loading && (
+                    <div
+                        style={{
+                            alignSelf: 'flex-start',
+                            maxWidth: '70%',
+                            background: '#ff69b4',
+                            color: 'white',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '1rem',
+                            fontStyle: 'italic',
+                        }}
+                    >
+                        FBD is typing…
+                    </div>
+                )}
 
-                        const bubbleWidth = msg.role === 'system'
-                            ? 'w-full sm:w-3/4'
-                            : isUser
-                                ? 'w-3/5 sm:w-2/5'
-                                : 'w-3/4 sm:w-1/2';
-
-                        return (
-                            <div key={idx} className={`flex ${align}`}>
-                                <div className={`${bubbleWidth} px-5 py-4 rounded-2xl shadow-lg my-7 ${bubbleBg} transition-transform duration-300 ease-out hover:scale-105`}>
-                                    {msg.content}
-                                </div>
-                            </div>
-                        );
-                    })}
-
-                    {isLoading && (
-                        <div className="flex justify-center">
-                            <div className="w-1/2 sm:w-1/3 bg-blue-900 text-white px-4 py-3 rounded-2xl shadow-lg my-4 animate-pulse">
-                                FBD is typing...
-                            </div>
-                        </div>
-                    )}
-
-                    <div ref={messagesEndRef} />
-                </div>
-            </main>
+                <div ref={endRef} />
+            </div>
         </div>
-    );
-};
-
-export default ChatComponent;
+    )
+}
