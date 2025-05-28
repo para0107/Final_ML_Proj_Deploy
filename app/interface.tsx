@@ -126,7 +126,7 @@ const ChatComponent: React.FC = () => {
                 {/* Chat & Metrics/Evaluation Panel */}
                 <div className="flex w-full max-w-5xl flex-1 overflow-hidden">
                     {/* Chat Column */}
-                    <div className="w-1/2 p-4 overflow-y-auto flex flex-col gap-6">
+                    <div className="w-1/2 p-4 overflow-y-auto flex flex-col gap-12">
                         {conversation.map((msg, idx) => (
                             <div
                                 key={idx}
