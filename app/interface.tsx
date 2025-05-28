@@ -1,178 +1,198 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
-import axios from 'axios'
+import React, { useState, useRef, useEffect } from 'react';
+import axios from 'axios';
+import './animations.css';
 
 type Message = {
-    role: 'user' | 'assistant' | 'system'
-    content: string
-}
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+};
+
+type Metric = {
+    dataset: string;
+    bleu: number | null;
+    rouge: Record<string, number> | null;
+};
 
 type RagChatResponse = {
-    answer: string
-    history: Message[]
-}
+    answer: string;
+    history: Message[];
+    metrics?: Metric[];
+};
 
-export default function ChatComponent() {
-    const [message, setMessage] = useState('')
-    const [conversation, setConversation] = useState<Message[]>([])
-    const [loading, setLoading] = useState(false)
-    const endRef = useRef<HTMLDivElement>(null)
+type EvaluateResponse = {
+    evaluation: string;
+};
+
+const ChatComponent: React.FC = () => {
+    const [message, setMessage] = useState('');
+    const [conversation, setConversation] = useState<Message[]>([]);
+    const [metrics, setMetrics] = useState<Metric[]>([]);
+    const [evaluation, setEvaluation] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
 
     useEffect(() => {
-        endRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }, [conversation])
+        scrollToBottom();
+    }, [conversation, isLoading, metrics, evaluation]);
 
     const sendMessage = async () => {
-        if (!message.trim()) return
-        setLoading(true)
+        if (!message.trim()) return;
 
-        const updated = [
-            ...conversation,
-            { role: 'user' as const, content: message.trim() },
-        ]
-        setConversation(updated)
+        // append user message locally
+        const updatedHistory = [...conversation, { role: 'user' as const, content: message }];
+        setConversation(updatedHistory);
+        setIsLoading(true);
+        setEvaluation(null);
 
         try {
-            const { data } = await axios.post<RagChatResponse>(
-                'http://localhost:8000/rag_chat',
-                {
-                    message,
-                    history: updated,
-                }
-            )
+            // 1) call chat endpoint
+            const chatResp = await axios.post<RagChatResponse>('http://localhost:8000/rag_chat', {
+                message,
+                history: updatedHistory,
+                ground_truth_source: 'all'
+            });
 
-            setConversation((prev) => [
+            // update conversation and metrics
+            setConversation(chatResp.data.history);
+            setMetrics(chatResp.data.metrics || []);
+
+            // 2) call evaluate endpoint
+            const evalResp = await axios.post<EvaluateResponse>('http://localhost:8000/evaluate', {
+                question: message,
+                answer: chatResp.data.answer
+            });
+            setEvaluation(evalResp.data.evaluation);
+
+        } catch (error) {
+            console.error(error);
+            setConversation(prev => [
                 ...prev,
-                { role: 'assistant', content: data.answer },
-            ])
-        } catch {
-            setConversation((prev) => [
-                ...prev,
-                {
-                    role: 'system',
-                    content: '⚠️ Could not connect to the chat service.',
-                },
-            ])
+                { role: 'system', content: 'Error: Could not connect to the chat service.' },
+            ]);
         } finally {
-            setMessage('')
-            setLoading(false)
+            setIsLoading(false);
+            setMessage('');
         }
-    }
+    };
 
+    // only show metrics where at least one non-null
+    const visibleMetrics = metrics
     return (
-        <div
-            style={{
-                minHeight: '100vh',
-                display: 'flex',
-                flexDirection: 'column',
-                background: 'linear-gradient(135deg, #ffe0f0 0%, #e0f7fa 100%)',
-                fontFamily: 'sans-serif',
-            }}
-        >
-            {/* HEADER + INPUT */}
-            <div style={{ textAlign: 'center', padding: '2rem 0' }}>
-                <h1 style={{ fontSize: '3rem', margin: 0 }}>Welcome to FBD LLM</h1>
-                <p style={{ margin: '0.5rem 0 1.5rem', color: '#555' }}>
+        <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#f3e8ff] via-[#ffe0f0] to-[#e0f7fa] font-sans font-medium tracking-wide">
+            {/* Welcome Title and Subtitle */}
+            <div className="flex flex-col items-center mt-8 mb-8">
+                <h2 className="text-4xl font-bold text-violet-700 mb-2">Welcome to FBD LLM</h2>
+                <p className="text-lg text-violet-500 text-center max-w-md">
                     Start a conversation! FBD is ready to help you.
                 </p>
-                <div style={{ display: 'inline-flex', width: '60%' }}>
-                    <input
-                        type="text"
-                        placeholder="Type your message..."
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                        disabled={loading}
-                        style={{
-                            flex: 1,
-                            padding: '0.75rem 1rem',
-                            fontSize: '1.1rem',
-                            borderRadius: '999px 0 0 999px',
-                            border: '2px solid #ff99c8',
-                            outline: 'none',
-                        }}
-                    />
-                    <button
-                        onClick={sendMessage}
-                        disabled={loading || !message.trim()}
-                        style={{
-                            padding: '0.75rem 1.5rem',
-                            fontSize: '1.1rem',
-                            borderRadius: '0 999px 999px 0',
-                            border: 'none',
-                            background:
-                                loading || !message.trim() ? '#ccc' : '#ff69b4',
-                            color: 'white',
-                            cursor: loading || !message.trim() ? 'not-allowed' : 'pointer',
-                        }}
-                    >
-                        Send
-                    </button>
+            </div>
+
+            {/* Centered Input Box */}
+            <div className="flex-1 flex flex-col items-center w-full">
+                <div className="flex justify-center w-full">
+                    <div className="w-[400px]">
+                        <div className="flex items-center bg-gradient-to-r from-blue-900 to-black rounded-2xl shadow-xl border-2 border-blue-900 p-3 mt-8 mb-8 h-20">
+                            <input
+                                type="text"
+                                value={message}
+                                onChange={e => setMessage(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                                placeholder="Type your message..."
+                                disabled={isLoading}
+                                className="flex-1 bg-transparent outline-none text-white placeholder-blue-300 px-2 text-lg h-full"
+                                style={{ minHeight: '2.5rem' }}
+                            />
+                            <button
+                                onClick={sendMessage}
+                                disabled={isLoading || !message.trim()}
+                                className={`ml-3 px-6 py-2 rounded-xl font-bold transition-all h-12 ${
+                                    isLoading || !message.trim()
+                                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-blue-700 to-blue-900 text-white hover:opacity-90'
+                                }`}
+                            >
+                                Send
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Chat & Metrics/Evaluation Panel */}
+                <div className="flex w-full max-w-5xl flex-1 overflow-hidden">
+                    {/* Chat Column */}
+                    <div className="w-1/2 p-4 overflow-y-auto flex flex-col gap-6">
+                        {conversation.map((msg, idx) => (
+                            <div
+                                key={idx}
+                                className={`flex animate-fadeIn transition-all duration-700 z-10 ${
+                                    msg.role === 'user'
+                                        ? 'justify-end'
+                                        : msg.role === 'assistant'
+                                            ? 'justify-start'
+                                            : 'justify-center'
+                                }`}
+                            >
+                                <div
+                                    className={`bg-blue-900 text-white rounded-3xl shadow-lg p-6 w-full max-w-xl whitespace-pre-wrap transition-all duration-700 ${
+                                        msg.role === 'system' ? 'bg-yellow-100 text-yellow-800' : ''
+                                    }`}
+                                >
+                                    {msg.content}
+                                </div>
+                            </div>
+                        ))}
+                        {isLoading && (
+                            <div className="flex animate-fadeIn transition-all duration-700 justify-start w-full z-10">
+                                <div className="bg-blue-900 p-6 rounded-3xl shadow-lg flex items-center w-full max-w-xl z-10">
+                                    <div className="animate-typing text-white text-lg font-medium">FBD is typing...</div>
+                                </div>
+                            </div>
+                        )}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* Metrics & Evaluation Column */}
+                    <div className="w-1/2 p-8 border-l-2 border-blue-900 flex flex-col justify-start">
+                        <h2 className="text-2xl font-semibold mb-4">Metrics</h2>
+                        {visibleMetrics.length === 0 ? (
+                            <p className="text-gray-600">No metrics yet.</p>
+                        ) : (
+                            visibleMetrics.map(m => (
+                                <div key={m.dataset} className="mb-4">
+                                    <div className="text-lg">
+                                        <strong>BLEU-{m.dataset}</strong> = {m.bleu != null ? m.bleu.toFixed(4) : '–'}
+                                    </div>
+                                    <div className="text-lg mt-1">
+                                        <strong>ROUGE-{m.dataset}</strong>{' '}
+                                        {m.rouge
+                                            ? Object.entries(m.rouge)
+                                                .map(([k, v]) => `${k}:${v.toFixed(4)}`)
+                                                .join(', ')
+                                            : '–'}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+
+                        <h2 className="text-2xl font-semibold mt-8 mb-4">Evaluation</h2>
+                        {evaluation ? (
+                            <div className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-gray-800">
+                                {evaluation}
+                            </div>
+                        ) : (
+                            <p className="text-gray-600">No evaluation yet.</p>
+                        )}
+                    </div>
                 </div>
             </div>
-
-            {/* FULL-WIDTH CHAT AREA */}
-            <div
-                style={{
-                    flex: 1,
-                    padding: '1rem',
-                    overflowY: 'auto',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem',
-                }}
-            >
-                {conversation.map((m, i) => (
-                    <div
-                        key={i}
-                        style={{
-                            alignSelf:
-                                m.role === 'user'
-                                    ? 'flex-end'
-                                    : m.role === 'assistant'
-                                        ? 'flex-start'
-                                        : 'center',
-                            maxWidth: '70%',
-                            background:
-                                m.role === 'user'
-                                    ? '#ff69b4'
-                                    : m.role === 'assistant'
-                                        ? 'white'
-                                        : '#fffae6',
-                            color: m.role === 'user' ? 'white' : '#333',
-                            padding: '0.75rem 1rem',
-                            borderRadius: '1rem',
-                            boxShadow:
-                                m.role === 'assistant'
-                                    ? '0 1px 4px rgba(0,0,0,0.1)'
-                                    : 'none',
-                            whiteSpace: 'pre-wrap',
-                            fontSize: '1rem',
-                        }}
-                    >
-                        {m.content}
-                    </div>
-                ))}
-
-                {loading && (
-                    <div
-                        style={{
-                            alignSelf: 'flex-start',
-                            maxWidth: '70%',
-                            background: '#ff69b4',
-                            color: 'white',
-                            padding: '0.75rem 1rem',
-                            borderRadius: '1rem',
-                            fontStyle: 'italic',
-                        }}
-                    >
-                        FBD is typing…
-                    </div>
-                )}
-
-                <div ref={endRef} />
-            </div>
         </div>
-    )
-}
+    );
+};
+
+export default ChatComponent;
