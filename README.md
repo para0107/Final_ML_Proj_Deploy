@@ -1,12 +1,12 @@
-# 🧠 FBD LLM Chat Interface
+# 🧠 LLM Chat Interface
 
-Welcome to the **FBD LLM Frontend**, the sleek and interactive user interface for a **Retrieval-Augmented Generation (RAG)**-powered chatbot system.  
+Welcome to the ** LLM Frontend**, the sleek and interactive user interface for a **Retrieval-Augmented Generation (RAG)**-powered chatbot system.  
 This React app connects to a FastAPI backend that leverages LLMs with context-aware retrieval to deliver **accurate, explainable, and self-evaluated answers**.
 
 ---
 
-- 🔙 [Backend: FBD RAG Chat API](https://github.com/your-username/backend-repo-name)
-- 🖼️ [Frontend: FBD Chat Interface](https://github.com/your-username/frontend-repo-name)
+- 🔙 [Backend: RAG Chat API](https://github.com/para0107/enhanced-llm-with-rag)
+- 🖼️ [Frontend: Chat Interface](https://github.com/para0107/rag-llm-frontend)
 
 ---
 
