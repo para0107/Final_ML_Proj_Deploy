@@ -1,40 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# 🧠 FBD LLM Chat Interface
 
-## Getting Started
+Welcome to the **FBD LLM Frontend**, the sleek and interactive user interface for a **Retrieval-Augmented Generation (RAG)**-powered chatbot system.  
+This React app connects to a FastAPI backend that leverages LLMs with context-aware retrieval to deliver **accurate, explainable, and self-evaluated answers**.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🎯 Purpose
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+This application serves as the **interface** for querying a backend chatbot that combines:
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+- Local LLMs via LM Studio API
+- Semantic retrieval using FAISS
+- Evaluation using BLEU, ROUGE, and LLM-based grading
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+Users can ask programming or academic questions and view not just the answers, but also **confidence metrics** and **structured feedback** on response quality.
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🚀 Features
 
-## Learn More
+### ✨ Real-Time Conversational UI
 
-To learn more about Next.js, take a look at the following resources:
+- Smooth, responsive chat interface with typing animations
+- Distinct message styling for `user`, `assistant`, and `system` messages
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
+### 📊 Live Metrics & Feedback
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- BLEU and ROUGE metrics calculated server-side and shown in real time
+- LLM-generated evaluation judging reasoning quality and correctness
 
-## Deploy on Vercel
+### 🔄 Full RAG Cycle Support
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Connects to `/rag_chat` to:
+  - Retrieve relevant documents via FAISS
+  - Query the LLM with context
+  - Return grounded answers and evaluation scores
+- Optionally calls `/evaluate` for structured verdicts from a grading model
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+---
+
+## 🗂 Code Structure
+
+| File/Component       | Purpose                                                                 |
+|----------------------|-------------------------------------------------------------------------|
+| `ChatComponent.tsx`  | Main interactive component that manages messages, state, and requests   |
+| `animations.css`     | Typing animations and transitions                                        |
+| `axios` API calls    | Communicates with backend endpoints (`/rag_chat`, `/evaluate`)          |
+| `Message`, `Metric`  | Type definitions for messages and evaluation metrics                    |
+
+---
+
+## 🧠 How It Works
+
+### 🔄 Flow Overview
+
+1. **User Types Message**
+2. React app sends:
+    - `POST /rag_chat` with full history and user query
+3. Backend returns:
+    - Updated history
+    - BLEU/ROUGE scores
+4. React app sends:
+    - `POST /evaluate` with (question, answer)
+5. Backend returns:
+    - Verdict: Correct/Incorrect
+    - Score: 0.0–1.0
+    - Comments: Brief reasoning analysis
+
+---
+
+## ⚙️ API Requirements
+
+Make sure your backend is running at: http://localhost:8000( fint it at : https://github.com/para0107/enhanced-llm-with-rag )
+
+The following endpoints must be available:
+
+| Endpoint       | Method | Description                                         |
+|----------------|--------|-----------------------------------------------------|
+| `/rag_chat`    | POST   | Retrieves, generates, and evaluates the answer      |
+| `/evaluate`    | POST   | Grades the answer using an LLM judge                |
+
+---
+
+## 📦 Setup Instructions
+
+1. Clone the repo:
+   ```bash
+   git clone https://github.com/your-org/fbd-llm-frontend.git
+   cd fbd-llm-frontend
+
+
+Install dependencies : pnpm install
+Run : pnpm dev 
+
+Make sure the FastAPI backend is running at localhost:8000
+
+
+
+User: How does binary search work?
+
+🧠 LLM w/ RAG: 
+  - "Binary search splits a sorted array into halves... 
+     Here’s the Python code..."
+
+📊 BLEU: 0.91
+📊 ROUGE: precision:0.89, recall:0.85
+📋 Evaluation:
+  Verdict: Correct
+  Score: 0.95
+  Comments: The logic is valid and supported by retrieved facts.
