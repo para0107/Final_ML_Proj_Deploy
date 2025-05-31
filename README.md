@@ -5,6 +5,11 @@ This React app connects to a FastAPI backend that leverages LLMs with context-aw
 
 ---
 
+- 🔙 [Backend: FBD RAG Chat API](https://github.com/your-username/backend-repo-name)
+- 🖼️ [Frontend: FBD Chat Interface](https://github.com/your-username/frontend-repo-name)
+
+---
+
 ## 🎯 Purpose
 
 This application serves as the **interface** for querying a backend chatbot that combines:
